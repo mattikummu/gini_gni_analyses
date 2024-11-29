@@ -5,7 +5,9 @@ These codes were used to analyse the interplay of subnational Gini coefficient a
 Chrisendo, Venla, Hoffman, Masoumzadeh Sayyar, Rocha, Sandström, Solt, Kummu. 2024. Income inequality has increased for over two-thirds of the global population. Preprint. 
 
 To run the code, you first need to run the following codes:
+
 Gini coefficient data creation: https://github.com/mattikummu/subnatGini
+
 GNI per capita data creation: https://github.com/mattikummu/subnatGNI
 
 
@@ -13,15 +15,15 @@ The code is numbered with the order it should be run. Below each code is briefly
 
 **0_install_packages.R**: install the needed packages
 
-**1_gini_gni_bins.R**: puts together admin 0 level (national) data. 
+**1_gini_gni_bins.R**: creates the Gini - GNI bins
 
-**2_gini_gni_groups**: Interpolates and extrapolates the missing values.
+**2_gini_gni_groups**: creates and plots the Gini - GNI combination groups
 
-**3_plot_gini_gni_bins.R**: puts together admin 1 level (sbunational) data, interpolates and extrapolates the missing values
+**3_plot_gini_gni_bins.R**: plots the bins
 
-**4_fuzzy_clustering.R**: calculates the ratio between admin 1 and admin 0 level
+**4_fuzzy_clustering.R**: performs the fuzzy clustering
 
-**5_urban_gini_analysis.R**:  combines the admin 0 and admin 1 level to a global grid and gpkg file; puts data to raster and polygon files
+**5_urban_gini_analysis.R**:  code for the urban gini analysis
 
 
 **functions**: the functions used in the scripts above are in this folder
