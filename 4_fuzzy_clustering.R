@@ -18,13 +18,17 @@ library(e1071)
 library(openxlsx)
 library(factoextra)
 library(clusterSim)
+library(forcats)
 library(ggplot2)
 library(viridis)
+library(scales)
 
 library(dplyr)
 library(tidyverse)
 
-#### Prepare data ####
+
+
+#### 1 Prepare data ####
 # Use:
 # 1) Slope of gini and gni
 # 2) Long term average of gini and gni/ Latest year
@@ -35,21 +39,22 @@ library(tidyverse)
 # Load data
 # Trends:
 # Inequality (slope)
-gini_slope <- rast('results/rast_slope_gini_disp_1990_2021.tif')*32 # multiply by 32 to get total slope
+gini_slope <- rast('../subnatGini/results/rast_slope_gini_disp_1990_2021.tif')*32 # multiply by 32 to get total slope
 # Income (percentual change)
-income_perc <- rast('results/rast_slope_perc_gnic.tif')
+income_perc <- rast('../subnatGini/results/rast_slope_perc_gnic.tif')
 
 # Income (GNI per capita)
-income <- rast('../hdi_subnat/results/rast_gnic_1990_2021.tif') %>% 
+# please change folder path to ../subnatGNI/
+income <- rast('../subnatGNI/results/rast_gnic_1990_2021.tif') %>% 
   `names<-`(c(seq(1990,2021,1))) #%>% terra::subset(as.character(seq(2000,2020,1)))
 #names(income) <- paste0('income_', names(income))
 # Inequality (GINI)
-gini <- rast('results/rast_gini_disp_1990_2021.tif') %>% 
+gini <- rast('../subnatGini/results/rast_gini_disp_1990_2021.tif') %>% 
   `names<-`(c(seq(1990,2021,1))) #%>% terra::subset(as.character(seq(2000,2020,1)))
 #names(gini) <- paste0('gini_', names(gini))
 
 # Population count
-pop <- terra::rast("data_gis/r_pop_GHS_1990_2022_5arcmin.tif")
+pop <- terra::rast("../subnatGini/data_gis/r_pop_GHS_1990_2022_5arcmin.tif")
 names(pop) <- paste0('pop', c(1990:2022))
 pop <- pop[[-33]]
 names(pop)
@@ -60,7 +65,7 @@ pop_mean <- mean(pop, na.rm =T)
 # Admin rasters
 
 
-adm1 <- rast('data_gis/gini_comb_Adm0Adm1_5arcmin.tif') 
+adm1 <- rast('../subnatGini/data_gis/gini_comb_Adm0Adm1_5arcmin.tif') 
 
 adm1[adm1 == 10] = NA # drop antarctica
 # plot(adm1)
@@ -78,25 +83,7 @@ gini_adm <- terra::zonal(gini, adm1, fun=mean, na.rm=T) %>%
 
 
 
-# 
-# adm1 <- rast('data/gadm_lev1_5arcmin.tif')
-# names(adm1) <- 'nmbr'
-# pop <- terra::rast("data/GlobPOP_5arcmin_1990_2022.tif")
-# names(pop) <- paste0('pop_', c(1990:2022))
-# pop <- pop[[-33]]
-# pop_mean <- mean(pop, na.rm =T)
-# 
-# # Aggregate to adm1 level
-# 
-# gini_adm <- terra::zonal(gini, adm1, fun=mean, na.rm = T, w=pop_mean) %>% as.tibble() %>% 
-#   pivot_longer(!nmbr, values_to = 'gini', names_to = 'year') %>% 
-#   group_by(nmbr) %>% 
-#   # take long term mean
-#   #summarise(mean_gini = mean(gini, na.rm=T))
-#   # select latest year
-#   filter(year == 2021) %>% 
-#   dplyr::select(-year)
-# 
+
 # 
 gini_slope_adm <- zonal(gini_slope, adm1, fun=mean, na.rm = T) %>%
   as.tibble() %>%
@@ -112,18 +99,18 @@ gini_slope_adm <- zonal(gini_slope, adm1, fun=mean, na.rm = T) %>%
 #   dplyr::select(-year)
 # 
 income_slope_adm <- terra::zonal(income_perc, adm1, fun=mean, na.rm=T, w=pop_mean) %>%
-  as.tibble() %>%
+  as_tibble() %>%
   rename('slope_gni'='gnic_slope_1990_2021')
 
 # Country borders for plotting
 # admin borders as sf for plotting
-sf_gadm1 <- terra::as.polygons(rast('data_gis/gini_comb_Adm0Adm1_5arcmin.tif')) %>% 
+sf_gadm1 <- terra::as.polygons(rast('../subnatGini/data_gis/gini_comb_Adm0Adm1_5arcmin.tif')) %>% 
   sf::st_as_sf() %>% # to sf
   rmapshaper::ms_simplify(.,keep=0.25,keep_shapes = T) %>% # simplify
   filter(! layer == 10) # drop antarctica
 
 
-sf_adm0 <- read_sf("/Users/mkummu/R/GIS_data_common/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
+sf_adm0 <- read_sf("../subnatGini/data_gis/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
   # simplify the shapefile
   rmapshaper::ms_simplify(keep = 0.25, keep_shapes = T) %>%
   st_as_sf() %>% 
@@ -137,6 +124,7 @@ data <- gini_adm %>%
   left_join(income_adm %>% select(layer, '2021') %>% rename(gnic = '2021')) %>% 
   left_join(income_slope_adm) %>% 
   rename(nmbr = layer)
+
 readr::write_csv(data, 'results/in_data_clusters.csv')
 
 # standardize values so that mean = 0 and sd=1 
@@ -151,7 +139,7 @@ data_mat <- data_stand %>%
   dplyr::select(-nmbr) %>%
   as.matrix()
 
-#### Test optimal cluster number #### 
+#### 2. Test optimal cluster number #### 
 set.seed(123)
 factoextra::fviz_nbclust(data_mat, kmeans, method='wss')
 factoextra::fviz_nbclust(data_mat, kmeans, method='silhouette')
@@ -180,7 +168,7 @@ print(gap)
 # that the clusters are distinct in comparison to random distribution.
 
 
-#### Clustering ----
+#### 3. Clustering ----
 # Initialize
 
 ncenters = 7
@@ -208,7 +196,7 @@ count(data_stand, cluster, name="n_units")
 openxlsx::write.xlsx(data_stand, 'results/data_cluster.xlsx', overwrite = T)
 
 #### Plots ---
-#### Supplementary Figure: Boxplots to show distribution of clustering variables ####
+#### 4. Supplementary Figure: Boxplots to show distribution of clustering variables ####
 
 pal <- rev(c("#74a0bd", "#81CBC1", "#8564ad", "#d2d289", "#c3a37a", "#b8828f", "#FED4E7")) #%>% as_tibble() %>% 
 # rename('hex'='value') %>% 
@@ -217,9 +205,6 @@ xord <- rev(c(1,2,3,4, 5,6,7))
 
 # # Order palette
 # pal <- pal %>% mutate(cluster = factor(cluster, levels = c(-1,xord)))
-
-library(forcats)
-library(ggplot2)
 
 # Mean gni 'outliers' ids 3368 (washington dc) and 2742 (singapore); consider removing for plotting?
 
@@ -264,8 +249,8 @@ ggsave(paste0('figures/FigS1_cluster_boxplots_', ncenters, '_', minconf,'.pdf'),
 
 
 
-#### Fig 4a: Clusters ----
-#### Plot Fig 4a: Clusters on map  ----
+#### Clusters ----
+#### 5 Clusters on map  ----
 # FIrst put clusters in raster format
 class_matrix <- data_stand %>% dplyr::select(nmbr, cluster) %>% as.matrix()
 
@@ -312,10 +297,10 @@ tmap_save(p_fig,filename = paste0('figures/fig_','cluster_map','.png'),width = 1
 
 
 # save as grid
-map_grob <- tmap_grob(cluster_map)
-pdf(paste0("plots/cmeans_clusters_",ncenters, '_', minconf,'_', Sys.Date(),".pdf"), height=10, width=20)
-cowplot::plot_grid(map_grob, plt)
-dev.off()
+# map_grob <- tmap_grob(p_cluster_map)
+# pdf(paste0("plots/cmeans_clusters_",ncenters, '_', minconf,".pdf"), height=10, width=20)
+# cowplot::plot_grid(map_grob, plt)
+# dev.off()
 
 #### Prep legend for Fig 3a ----
 
@@ -363,7 +348,7 @@ cluster_medians <- readr::read_csv('results/cluster_medians_7_0.2.csv') %>%
 
 mydata <- cluster_medians 
 
-library(scales)
+
 
 p_cluster_median_gini <- ggplot2::ggplot(mydata %>% filter(parameter == 'gini'), aes(x=parameter, y=cluster)) +
   geom_point(aes(fill=value), size=7, shape=22)+
@@ -407,7 +392,7 @@ mydata_round <- cluster_medians %>% filter(parameter %in% c('gini_disp_slope_199
 p_cluster_change_gini <- ggplot(mydata_round %>% filter(parameter == 'gini_disp_slope_1990_2021'), 
                                 aes(x=parameter, y=cluster, group=bool)) +
   geom_point(aes(shape=bool, fill=value), size=4.5)+
-  scale_shape_manual(values=c(25, 24))+
+  scale_shape_manual(values=c(25, 23, 24))+
   scale_fill_gradient2(low = muted("blue"), mid = "white",
                        high = muted("red"),limits=c(-0.07,0.04),breaks=c(-0.06, -0.04, -0.02, 0, 0.02, 0.04), oob=squish)+
   ggthemes::theme_tufte()+
@@ -439,7 +424,7 @@ p_legend <- gridExtra::grid.arrange(p_cluster_median_gini, p_cluster_median_gni,
                                     p_cluster_change_gini, p_cluster_change_gni,
                                     ncol= 2)
 
-ggsave(paste0('figures/Fig4a_cluster_legend_',Sys.Date(),'.pdf'), p_legend)
+ggsave(paste0('figures/Fig4a_cluster_legend','.pdf'), p_legend)
 
 #### Fig 4b: Heterogeneity of countries ----
 
@@ -471,7 +456,7 @@ prov_countries <- terra::extract(r_clusters, vect(prov_id), fun = 'modal', na.rm
   as_tibble() %>% 
   bind_cols(prov_id) 
 
-adm1_adm0 <- terra::extract(rast('data_gis/gini_Adm0_5arcmin.tif'), vect(prov_id), fun = 'modal', na.rm=T) %>% 
+adm1_adm0 <- terra::extract(rast('../subnatGini/data_gis/gini_Adm0_5arcmin.tif'), vect(prov_id), fun = 'modal', na.rm=T) %>% 
   as_tibble() %>% 
   rename(adm0 = layer)
 
@@ -494,7 +479,7 @@ n_clusters <- prov_countries_adm0_clust %>%
 
 # Plot number of clusters on a map
 # Join geometry information to n_clusters
-sf_countries <- as.polygons(rast('data_gis/gini_Adm0_5arcmin.tif')) %>% 
+sf_countries <- as.polygons(rast('../subnatGini/data_gis/gini_Adm0_5arcmin.tif')) %>% 
   st_as_sf() %>% 
   rename(adm0 = layer)
   

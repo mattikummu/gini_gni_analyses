@@ -10,7 +10,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 ## Open packages
 library(terra)
-library(dplyr)
+
 library(stringr)
 library(tidyr)
 library(sf)
@@ -26,47 +26,49 @@ library(pals)
 library(ggplot2)
 library(biscale)
 
+library(dplyr)
+library(tidyverse)
 
-
-#### Read data ------
+#### 1 Read data ------
 # Income (GNI per capita)
-income <- rast('../hdi_subnat/results/rast_gnic_1990_2021.tif')
+# please change folder path to ../subnatGNI/
+income <- rast('../subnatGNI/results/rast_gnic_1990_2021.tif')
 years <- as.character(seq(1990,2021,1,))
 # Change layer names for income
 names(income) <- c(rep('income', 32)) %>% str_c(., years)
 
 # Inequality (GINI)
-gini <- rast('results/rast_gini_disp_1990_2021.tif')
+gini <- rast('../subnatGini/results/rast_gini_disp_1990_2021.tif')
 names(gini) <- c(rep('gini', 32)) %>% str_c(., years)
 
 # Change in gini (slope used here)
-gini_slope <- rast('results/rast_slope_gini_disp_1990_2021.tif')*32 # multiply by 32 to get total slope
+gini_slope <- rast('../subnatGini/results/rast_slope_gini_disp_1990_2021.tif')*32 # multiply by 32 to get total slope
 # Change in GNI (percentual change used here)
-income_perc <- rast('results/rast_slope_perc_gnic.tif')
+income_perc <- rast('../subnatGini/results/rast_slope_perc_gnic.tif')
 
 # Population count
-pop <- terra::rast("data_gis/r_pop_GHS_1990_2022_5arcmin.tif")
+pop <- terra::rast("../subnatGini/data_gis/r_pop_GHS_1990_2022_5arcmin.tif")
 names(pop) <- paste0('pop', c(1990:2022))
 pop <- pop[[-33]]
 names(pop)
 pop_mean <- mean(pop, na.rm =T)
 
 # admin borders as sf for plotting
-sf_gadm1 <- terra::as.polygons(rast('data_gis/gini_comb_Adm0Adm1_5arcmin.tif')) %>% 
+sf_gadm1 <- terra::as.polygons(rast('../subnatGini/data_gis/gini_comb_Adm0Adm1_5arcmin.tif')) %>% 
   sf::st_as_sf() %>% # to sf
   rmapshaper::ms_simplify(.,keep=0.1,keep_shapes = T) # simplify
 
 
-sf_adm0 <- read_sf("/Users/mkummu/R/GIS_data_common/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
+sf_adm0 <- read_sf("../subnatGini/data_gis/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
   # simplify the shapefile
-  rmapshaper::ms_simplify(keep = 0.2, keep_shapes = T) %>%
+  rmapshaper::ms_simplify(keep = 0.35, keep_shapes = T) %>%
   st_as_sf() %>% 
   filter(!iso_a3 == 'ATA')
 
 
-#### Aggregate income and inequality to adm1 level ----
+#### 2 Aggregate income and inequality to adm1 level ----
 
-adm1 <- rast('data_gis/gini_comb_Adm0Adm1_5arcmin.tif')
+adm1 <- rast('../subnatGini/data_gis/gini_comb_Adm0Adm1_5arcmin.tif')
 
 # Aggregate population as zonal sum
 pop_adm <- terra::zonal(pop, adm1, fun=sum, na.rm=T) %>% 
@@ -81,8 +83,8 @@ gini_adm <- terra::zonal(gini, adm1, fun=mean, na.rm=T) %>%
   as.tibble()
 
 
-#### Figure 2 ----
-#### Prep Fig 2a: Categorize areas with combinations of GINI and GNI: WB and inequality grouping ----
+
+#### 3 Categorize areas with combinations of GINI and GNI: WB and inequality grouping ----
 # Combine into a matrix determining the number of people living under each category
 
 # Based on literature
@@ -171,7 +173,7 @@ cat_levels <- data_groups %>%
 
 data_groups <- data_groups %>% mutate(category = factor(category, cat_levels))
 
-### Plot Fig 2a: GINI+GNI combinations-----
+### 4 GINI+GNI combinations-----
 
 # Create palette
 # First view palette
@@ -262,9 +264,9 @@ tmap_save(map1990, 'figures/fig2a_map1990.png', units = 'mm', width = 110, heigh
 tmap_save(map2021, 'figures/fig2a_map2021.png', units = 'mm', width = 110, height = 55, dpi = 450)
 
 # Save
-cowplot::save_plot(str_c('figures/fig2a_',Sys.Date(),'.pdf'), gini_gni_map)
+cowplot::save_plot(str_c('figures/fig2a','.pdf'), gini_gni_map)
 
-#### Prep Fig 2b and 2c: Number of people and pop change in each category in 1990 and 2021  ----
+#### 5 Number of people and pop change in each category in 1990 and 2021  ----
 
 # Population data only for 1990-2020
 # Population in each adm unit
@@ -320,14 +322,14 @@ gini_pop <- pop_groups %>% group_by(cat_gini) %>%
          relPop2021 = round(relPop2021*100)) %>% 
   dplyr::select(cat_gini, pop1990, relPop1990, pop2021,relPop2021)
 
-write.xlsx(gini_pop, paste0('results/gini_pop_',Sys.Date(),'.xlsx'))
-write.xlsx(gni_pop, paste0('results/gni_pop_',Sys.Date(),'.xlsx'))
+write.xlsx(gini_pop, paste0('results/gini_pop','.xlsx'))
+write.xlsx(gni_pop, paste0('results/gni_pop','.xlsx'))
 
 # Save to results
-openxlsx::write.xlsx(pop_groups, paste0('results/fig2_gni_gini_groups_pop_',Sys.Date(),'.xlsx'))
+openxlsx::write.xlsx(pop_groups, paste0('results/fig2_gni_gini_groups_pop','.xlsx'))
 
 
-### Plot Fig 2b: population in 1990 and 2021 ----
+### 6 population in 1990 and 2021 ----
 # Define levels
 pop_groups <- pop_groups %>% mutate(cat_gini = factor(cat_gini, levels = rev(c('severe','big','adequate','relative'))),
                                     cat_gni = factor(cat_gni, levels = c('low','lowmid','highmid','high')))
@@ -355,7 +357,7 @@ plot_pop_rel <- pop_groups %>%
 plot_pop_rel
 
 # save
-ggsave(paste0('figures/fig2b_relative_pop_gni_gini_groups_',Sys.Date(),'.pdf'), plot_pop_rel)
+ggsave(paste0('figures/fig2b_relative_pop_gni_gini_groups','.pdf'), plot_pop_rel)
 
 ### Plot Fig 2c: Change in population in each group ----
 plot_pop_change <- pop_groups %>% #filter(year%in% c(2000,2020)) %>% mutate(popSum = popSum/1000000) %>%  #mutate(popSum = log10(popSum)) %>% 
@@ -377,11 +379,11 @@ plot_pop_change <- pop_groups %>% #filter(year%in% c(2000,2020)) %>% mutate(popS
 
 plot_pop_change
 
-ggsave(paste0('figures/Fig2c_change_relative_pop_gni_gini_groups_',Sys.Date(),'.pdf'), plot_pop_change)
+ggsave(paste0('figures/Fig2c_change_relative_pop_gni_gini_groups','.pdf'), plot_pop_change)
 
 
-#### Fig 3: Increasing and decreasing equality and income -----
-#### Prep Fig 3a: CHANGE IN INEQUALITY ----
+#### 7 Increasing and decreasing equality and income -----
+#### 7.1 CHANGE IN INEQUALITY ----
 # GINI
 # Change in inequality is STRONG if decrease/increase (i.e. slope) </> 0.05 -> categorise STRONG INCREASE 2, STRONG DECREASE -2
 # Change in inequality is MODERATE if decrease/increase is smaller than this -> INCREASE 1, DECREASE -1
@@ -405,7 +407,7 @@ gini_change_classified <- ifel((gini_slope <= thresholds[2,1]), -2,
 plot(gini_change_classified)
 
 
-### Plot Fig 3a ----
+### Plot Fig  ----
 
 mypal <- c("#196a99","#75aac4","#d39a78","#b95d2c") #,"#EAEAEA"=0
 
@@ -434,14 +436,14 @@ gini_change_map <- tm_shape(mydata, raster.warp = FALSE) +
             frame = FALSE)
 gini_change_map
 
-tmap::tmap_save(gini_change_map, str_c('figures/Fig3a_gini_change_',Sys.Date(),'.pdf'))
+tmap::tmap_save(gini_change_map, str_c('figures/Fig3a_gini_change','.pdf'))
 
 p_fig = gini_change_map +
   tm_layout(legend.show=FALSE)
 
 tmap_save(p_fig,filename = paste0('figures/fig_','gini_trend_classes','.png'),width = 110, units='mm', dpi = 450)
 
-#### Prep Fig 3b: CHANGE IN INCOME ----
+#### 7.2 CHANGE IN INCOME ----
 # Change in income STRONG if decrease/increase </> 0.15 -> strong increase 2, strong decrease -2
 # Change in income MODERATE if decrease/increase smaller than this -> increase 1, decrease -1 
 
@@ -480,7 +482,7 @@ gni_change_map <- tm_shape(mydata, raster.warp = FALSE) +
             frame = FALSE)
 gni_change_map
 
-tmap::tmap_save(gni_change_map, str_c('figures/Fig3b_gni_change',Sys.Date(),'.pdf'))
+tmap::tmap_save(gni_change_map, str_c('figures/Fig3b_gni_change','.pdf'))
 
 p_fig = gni_change_map +
   tm_layout(legend.show=FALSE)
@@ -511,9 +513,9 @@ pop_gini <- pop_gini %>%
   rename('Population in 1990 (M)' = 'pop1990') %>% 
   rename('Population in 2021 (M)' = 'pop2021')
 
-write.xlsx(pop_gini, paste0('results/Fig3d_pop_gini_change_', Sys.Date(),'.xlsx'))
+write.xlsx(pop_gini, paste0('results/Fig3d_pop_gini_change','.xlsx'))
 
-#### Prep Fig 3d: share of global pop living where income changed ----
+#### 8 share of global pop living where income changed ----
 pop_gni <- terra::zonal(pop, income_change_classified, fun = sum, na.rm=T) %>% 
   as_tibble() %>% 
   dplyr::select(gnic_slope_1990_2021, pop1990, pop2021)
@@ -534,13 +536,13 @@ pop_gni <- pop_gni %>% mutate(relPop1990 = pop1990/sum(pop_gni$pop1990), #in 200
   rename('Population in 2021 (M)' = 'pop2021')
 pop_gni
 
-write.xlsx(pop_gni, paste0('results/Fig3d_pop_gni_change_', Sys.Date(),'.xlsx'))
+write.xlsx(pop_gni, paste0('results/Fig3d_pop_gni_change','.xlsx'))
 
 
-#### Prep Fig 3d: People living in inequality-income -bins ----
+#### 9 People living in inequality-income -bins ----
 
 # Combination bins defined in another script (inequality-income bins)
-gini_gni_bins <- terra::rast("results/inequality_income_bins_raster_4_2024-08-08.tif")
+gini_gni_bins <- terra::rast("results/inequality_income_bins_raster_4.tif")
 names(gini_gni_bins) <- 'change'
 plot(gini_gni_bins)
 
@@ -557,7 +559,22 @@ pop_bins <- left_join(terra::zonal(pop$pop1990, gini_gni_bins, fun= sum, na.rm=T
 # Add categories 
 # Gini 10: strong decrease, 20: decrease, 30: increase, 40: strong increase
 # Income 1: strong decrease, 2: decrease, 3: increase, 4: strong increase
-bins <- tibble(unique(gini_gni_bins)) %>% 
+
+# Define the two sets of numbers
+gini <- c(10, 20, 30, 40)
+income <- c(1, 2, 3, 4)
+
+# Create all combinations using expand.grid
+combinations <- expand.grid(gini, income)
+
+# Convert to a tibble
+combinations_tibble <- as_tibble(combinations) %>% 
+  mutate(change = Var1 + Var2) %>% 
+  dplyr::select(-Var1, -Var2)
+
+
+bins <- #tibble(unique(gini_gni_bins)) %>% 
+  combinations_tibble %>% 
   arrange(change) %>% 
   mutate(change_gini = c(rep('strong decrease', 4), rep('decrease',4), rep('increase',4), rep('strong increase', 4))) %>% 
   mutate(change_gni = rep(c("strong decrease" ,"decrease", "increase",'strong increase'), 4)) %>% 
@@ -577,7 +594,7 @@ pop_temp <- pop_temp %>% group_by(category) %>%
 
 pop_temp %>% group_by(change_gni) %>% summarise(sum2021 = sum(relPop2021, na.rm=T))
 
-### Plot Fig 3d: Share of global population in each inequality-income bin -----
+### 10 Share of global population in each inequality-income bin -----
 plot3 <- pop_temp %>% #mutate(change_pop_perc = if_else(change_pop_perc > 1, 1, change_pop_perc)) %>% 
   ggplot(., aes(change_gini, change_gni)) +                           
   geom_tile(aes(fill = relPop2021*100)) +
@@ -601,7 +618,7 @@ plot3 <- pop_temp %>% #mutate(change_pop_perc = if_else(change_pop_perc > 1, 1, 
   coord_fixed()
 plot3
 
-ggsave(paste0('figures/Fig3d_relpop2021_gini_gni_change_', Sys.Date(),'.pdf'), plot3)
+ggsave(paste0('figures/Fig3d_relpop2021_gini_gni_change','.pdf'), plot3)
 
 
 

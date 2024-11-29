@@ -16,25 +16,25 @@ library(tidyterra)
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 
-### load data
+### 1 load data -----
 
-r_gini_adm1 <- rast('results/rast_gini_disp_1990_2021.tif')
+r_gini_adm1 <- rast('../subnatGini/results/rast_gini_disp_1990_2021.tif')
 
-r_gini_adm0 <- rast('results/rast_adm0_gini_disp_1990_2021.tif')
+r_gini_adm0 <- rast('../subnatGini/results/rast_adm0_gini_disp_1990_2021.tif')
 
-v_gini_adm1 <- vect('results/vect_gini_disp_1990_2021.gpkg') %>% 
+v_gini_adm1 <- vect('../subnatGini/results/vect_gini_disp_1990_2021.gpkg') %>% 
   filter(!iso3 == 'ATA')
-v_gini_adm0 <- vect('results/vect_adm0_gini_disp_1990_2021.gpkg') %>% 
+v_gini_adm0 <- vect('../subnatGini/results/vect_adm0_gini_disp_1990_2021.gpkg') %>% 
   filter(!iso3 == 'ATA')
 
-r_urb <- rast('../misc/percentileNormalisation/output/urbanisationCntryWise_GHS2023a.tif')
+r_urb <- rast('../subnatGini/data_gis/urbanisationCntryWise_GHS2023a.tif')
 
 ## population
 
 
 r_ref_wgs84_5arcmin <- rast(ncol=360*12, nrow=180*12)
 
-r_popCount <- rast('data_gis/r_pop_GHS_1990_2022_5arcmin.tif')
+r_popCount <- rast('../subnatGini/data_gis/r_pop_GHS_1990_2022_5arcmin.tif')
 
 # pop for year 2021
 r_popCount_ext <- extend(subset(r_popCount, nlyr(r_popCount)-1 ),r_ref_wgs84_5arcmin)
@@ -42,7 +42,7 @@ r_popCount_ext <- extend(subset(r_popCount, nlyr(r_popCount)-1 ),r_ref_wgs84_5ar
 r_popCount_ext_1990 <- extend(subset(r_popCount, 1 ),r_ref_wgs84_5arcmin)
 
 
-### populaion weighted urb
+### 2. populaion weighted urb ----
 
 sf_pop <- terra::extract(r_popCount_ext,v_gini_adm1,fun='sum', na.rm=T)
 sf_pop1990 <- terra::extract(r_popCount_ext_1990,v_gini_adm1,fun='sum', na.rm=T)
@@ -60,7 +60,7 @@ sf_urb1990 <- sf_pop_x_urb1990 / sf_pop1990 %>%
 
 #head(sf_urb1990)
 
-### ratio adm1 vs adm0
+### 3 ratio adm1 vs adm0 -----
 
 df_ratio <- v_gini_adm1 %>% 
   as_tibble() %>% 
@@ -118,37 +118,11 @@ df_ratio_corr_count <- df_ratio_corr %>%
             positive2021 = sum(corr2021 > 0), 
             negative2021 = sum(corr2021 < 0))
 
-### plot
+### 3.2 plot -----
 
+source('functions/f_Plot_sfNetChng.R')
 
-myPlot_sfNetMgr<-function(sf_in,column_in,breaks_in, pal, midpnt = 0 ){
-  
-  #pal <-  scico(9, begin = 0.1, end = 0.9,direction = 1, palette = "vik")
-  
-  plt_subnatMigr <- tm_shape(sf_in, projection = "+proj=robin") +
-    tm_fill(col = column_in,
-            palette = pal,
-            breaks = breaks_in,
-            midpoint = midpnt,
-            contrast = c(0, 0.7),
-            lwd=0,
-            colorNA = 'white',
-            legend.is.portrait = FALSE)+
-    tm_shape(sf_adm0, projection = "+proj=robin") +
-    tm_borders(col = "black",
-               lwd = 0.1)+
-    tm_layout(#main.title = "Origin of data",
-      main.title.position = "center",
-      legend.outside = TRUE,
-      legend.outside.position = "bottom",
-      legend.text.size =.25,
-      legend.title.size = .75,
-      legend.width = 0.6,
-      #legend.height = -10, 
-      frame = FALSE)
-}
-
-sf_adm0 <- read_sf("/Users/mkummu/R/GIS_data_common/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
+sf_adm0 <- read_sf("../subnatGini/data_gis/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
   # simplify the shapefile
   rmapshaper::ms_simplify(keep = 0.05, keep_shapes = T) %>%
   st_as_sf()  %>% 
@@ -163,8 +137,8 @@ giniRange <- seq( plyr::round_any( minGini,accuracy=0.05,f=floor ),
 
 palGini <-  scico::scico(9, begin = 0.1, end = 0.9,direction = -1, palette = "broc")
 
-p_gini_urb_corr_1990 <- myPlot_sfNetMgr(v_gini_adm0_urb_corr,'corr1990',giniRange, pal = palGini)
-p_gini_urb_corr_2021 <- myPlot_sfNetMgr(v_gini_adm0_urb_corr,'corr2021',giniRange, pal = palGini)
+p_gini_urb_corr_1990 <- f_Plot_sfNetChng(v_gini_adm0_urb_corr,'corr1990',giniRange, pal = palGini)
+p_gini_urb_corr_2021 <- f_Plot_sfNetChng(v_gini_adm0_urb_corr,'corr2021',giniRange, pal = palGini)
 p_gini_urb_corr_1990
 p_gini_urb_corr_2021
 
@@ -173,7 +147,7 @@ tmap_save(p_gini_urb_corr_2021,filename = 'figures/fig_gini_ratio_urb_correlatio
 
 
 
-### test also slope in rural vs urban areas
+### 5. test also slope in rural vs urban areas ----
 
 
 df_ratio_slope <- v_gini_adm1 %>% 
@@ -205,7 +179,7 @@ df_ratio_slope_corr_count <- df_ratio_slope_corr %>%
 
 # plot
 
-sf_adm0 <- read_sf("/Users/mkummu/R/GIS_data_common/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
+sf_adm0 <- read_sf("../subnatGini/data_gis/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
   # simplify the shapefile
   rmapshaper::ms_simplify(keep = 0.05, keep_shapes = T) %>%
   st_as_sf()  %>% 
@@ -220,7 +194,7 @@ giniRange <- seq( plyr::round_any( minGini,accuracy=0.05,f=floor ),
 
 palGini <-  scico::scico(9, begin = 0.1, end = 0.9,direction = -1, palette = "broc")
 
-p_gini_urb_corr_slope <- myPlot_sfNetMgr(v_gini_adm0_urb_corr_slope,'correlation',giniRange, pal = palGini)
+p_gini_urb_corr_slope <- f_Plot_sfNetChng(v_gini_adm0_urb_corr_slope,'correlation',giniRange, pal = palGini)
 p_gini_urb_corr_slope
 
 p_gini_urb_coll <- tmap_arrange(p_gini_urb_corr_1990,
@@ -258,39 +232,12 @@ tmap_save(p_gini_urb_coll,filename = 'figures/fig_gini_slope_urb_correlation.pdf
 
 
 
-##### plot urban
+##### 6. plot urban -----
 
 
+source('functions/f_Plot_sfAbs.R')
 
-myPlot_sfAbs<-function(sf_in,column_in,breaks_in, 
-                       colPal = scico(9, begin = 0.1, end = 0.9,direction = 1, palette = "nuuk")){
-  
-  pal <-  colPal
-  
-  plt_subnatMigr <- tm_shape(sf_in, projection = "+proj=robin") +
-    tm_fill(col = column_in,
-            palette = pal,
-            #contrast = c(0, 0.7),
-            breaks = breaks_in,
-            #lwd=0.0,
-            legend.is.portrait = FALSE)+
-    tm_shape(sf_adm0, projection = "+proj=robin") +
-    tm_borders(col = "black",
-               lwd = 0.1)+
-    tm_layout(#main.title = "Origin of data",
-      main.title.position = "center",
-      legend.outside = TRUE,
-      legend.outside.position = "bottom",
-      legend.text.size = .25,
-      legend.title.size = .75,
-      legend.width = 0.6,
-      frame = FALSE)
-}
-
-
-
-
-sf_adm0 <- read_sf("/Users/mkummu/R/GIS_data_common/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
+sf_adm0 <- read_sf("../subnatGini/data_gis/ne_50m_adm0_all_ids/adm0_NatEarth_all_ids.shp") %>% 
   # simplify the shapefile
   rmapshaper::ms_simplify(keep = 0.05, keep_shapes = T) %>%
   st_as_sf()  %>% 
@@ -311,7 +258,7 @@ v_gini_adm0_urb <- v_gini_adm1 %>%
   st_as_sf() 
 
 
-p_gini_urb <- myPlot_sfNetMgr(v_gini_adm0_urb,'urb',UrbRange, pal = palUrb, midpnt =  1)
+p_gini_urb <- f_Plot_sfNetChng(v_gini_adm0_urb,'urb',UrbRange, pal = palUrb, midpnt =  1)
 p_gini_urb
 
 p_gini_urb_noLegend <- p_gini_urb + 
