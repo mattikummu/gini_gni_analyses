@@ -2,9 +2,7 @@
 
 These codes were used to analyse the interplay of subnational Gini coefficient and GNI per capita at the global scale. It is part of the following publication.  Please do cite this paper when using the codes.
 
-Chrisendo D, Niva V, Hoffman R, Sayyar SM, Rocha J, Sandström V, Solt F, Kummu M. 2024. Income inequality has increased for over two-thirds of the global population. Preprint. 
-
-Preprint is available at: https://doi.org/10.21203/rs.3.rs-5548291/v1
+Chrisendo D, Niva V, Hoffman R, Sayyar SM, Rocha J, Sandström V, Solt F, Kummu M. 2024. Income inequality has increased for over two-thirds of the global population. Preprint. doi: https://doi.org/10.21203/rs.3.rs-5548291/v1
 
 To run the code, you first need to run the following codes:
 
